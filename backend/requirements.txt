@@ -1,0 +1,59 @@
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database & ORM
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# Supabase Integration
+supabase==2.3.0
+
+# Caching
+redis==5.0.1
+
+# HTTP Clients & API Integration
+aiohttp==3.9.1
+httpx==0.25.2
+requests==2.31.0
+
+# Data Processing & Validation
+pydantic==2.5.1
+pydantic-settings==2.1.0
+pandas==2.1.4
+numpy==1.25.2
+
+# MCP (Model Context Protocol)
+mcp==1.0.0
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Environment & Configuration
+python-dotenv==1.0.0
+
+# Logging & Monitoring
+structlog==23.2.0
+
+# Rate Limiting
+slowapi==0.1.9
+
+# NLP & Query Processing
+spacy==3.7.2
+scikit-learn==1.3.2
+nltk==3.8.1
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Development Tools
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+
+# API Documentation
+fastapi-utils==0.2.1 
