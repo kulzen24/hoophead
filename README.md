@@ -179,7 +179,7 @@ ENVIRONMENT=development
 # Ball Don't Lie API Authentication
 BALLDONTLIE_API_KEY=your-ball-dont-lie-api-key
 HOOPHEAD_ENCRYPTION_KEY=your-32-character-encryption-key
-HOOPHEAD_API_KEYS=[{"key": "backup-key", "tier": "pro", "label": "Backup"}]
+HOOPHEAD_API_KEYS=[{"key": "backup-key", "tier": "all-star", "label": "Backup"}]
 
 # Ball Don't Lie API Configuration
 API_REQUEST_DELAY=0.6
@@ -197,12 +197,14 @@ HoopHead features an enterprise-grade authentication system with tiered access m
 
 ### API Tiers
 
-| Tier       | Requests/Hour | Requests/Minute | Concurrent | Features |
-|------------|---------------|-----------------|------------|----------|
-| **Free**   | 100           | 10              | 1          | Basic stats, teams, players |
-| **Pro**    | 1,000         | 50              | 3          | + Advanced stats, historical data |
-| **Premium**| 5,000         | 200             | 5          | + Real-time data |
-| **Enterprise**| 50,000     | 1,000           | 10         | + Bulk export |
+| Tier       | Requests/Hour | Requests/Minute | Concurrent | Price | Features |
+|------------|---------------|-----------------|------------|-------|----------|
+| **Free**   | 300           | 5               | 1          | $0    | Teams, players, games |
+| **ALL-STAR**| 3,600        | 60              | 2          | $9.99 | + Player stats, injuries |
+| **GOAT**   | 36,000        | 600             | 5          | $39.99| + Box scores, standings, odds |
+| **Enterprise**| 36,000*    | 600*            | 10         | Custom| + Bulk export |
+
+*Matching Ball Don't Lie API actual pricing. Enterprise tier uses GOAT limits until custom plans available.*
 
 ### Key Features
 

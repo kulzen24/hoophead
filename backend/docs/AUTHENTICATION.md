@@ -38,22 +38,26 @@ auth_manager = AuthenticationManager()
 
 # Add multiple API keys with different tiers
 free_key_id = auth_manager.add_api_key("your-free-key", APITier.FREE, "Development Key")
-pro_key_id = auth_manager.add_api_key("your-pro-key", APITier.PRO, "Production Key")
+allstar_key_id = auth_manager.add_api_key("your-allstar-key", APITier.ALL_STAR, "Production Key")
 
 # Use specific key with client
-async with BallDontLieClient(key_id=pro_key_id) as client:
-    # This will use the Pro tier limits and tracking
+async with BallDontLieClient(key_id=allstar_key_id) as client:
+    # This will use the ALL-STAR tier limits and tracking
     response = await client.get_players(Sport.NBA, search="LeBron")
 ```
 
 ## API Tier Limits
 
-| Tier       | Requests/Hour | Requests/Minute | Concurrent | Features |
-|------------|---------------|-----------------|------------|----------|
-| **Free**   | 100           | 10              | 1          | Basic stats, teams, players |
-| **Pro**    | 1,000         | 50              | 3          | + Advanced stats, historical data |
-| **Premium**| 5,000         | 200             | 5          | + Real-time data |
-| **Enterprise**| 50,000     | 1,000           | 10         | + Bulk export |
+*Matching Ball Don't Lie API actual pricing and limits*
+
+| Tier       | Requests/Hour | Requests/Minute | Concurrent | Price | Features |
+|------------|---------------|-----------------|------------|-------|----------|
+| **Free**   | 300           | 5               | 1          | $0    | Teams, players, games |
+| **ALL-STAR**| 3,600        | 60              | 2          | $9.99 | + Player stats, injuries |
+| **GOAT**   | 36,000        | 600             | 5          | $39.99| + Box scores, standings, odds |
+| **Enterprise**| 36,000*    | 600*            | 10         | Custom| + Bulk export |
+
+*\*Enterprise tier uses GOAT limits until custom plans available*
 
 ## Environment Variables
 
@@ -68,7 +72,7 @@ Example `.env` file:
 ```bash
 BALLDONTLIE_API_KEY=your-primary-api-key-here
 HOOPHEAD_ENCRYPTION_KEY=your-32-character-encryption-key
-HOOPHEAD_API_KEYS='[{"key": "backup-key", "tier": "pro", "label": "Backup"}]'
+HOOPHEAD_API_KEYS='[{"key": "backup-key", "tier": "all-star", "label": "Backup"}]'
 ```
 
 ## Authentication Manager API
@@ -83,7 +87,7 @@ auth_manager = AuthenticationManager()
 # Add API key
 key_id = auth_manager.add_api_key(
     api_key="your-api-key",
-    tier=APITier.PRO,
+    tier=APITier.ALL_STAR,
     label="Production Key",
     set_as_default=True
 )

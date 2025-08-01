@@ -43,7 +43,7 @@ The HoopHead authentication system provides enterprise-grade API key management 
 **Core Functionality:**
 ```python
 # Key Management
-key_id = auth_manager.add_api_key(api_key, APITier.PRO, "Production Key")
+key_id = auth_manager.add_api_key(api_key, APITier.ALL_STAR, "Production Key")
 api_key = auth_manager.get_api_key(key_id)  # Decrypted on demand
 auth_manager.remove_api_key(key_id)
 
@@ -102,12 +102,14 @@ key_id = hashlib.sha256(api_key.encode()).hexdigest()[:16]  # Unique identifier
 
 ### Access Control Matrix
 
-| Tier | Hour Limit | Minute Limit | Concurrent | Cache Priority | Features |
-|------|------------|--------------|------------|----------------|----------|
-| Free | 100 | 10 | 1 | 1 (Low) | Basic API access |
-| Pro | 1,000 | 50 | 3 | 2 (Medium) | + Historical data |
-| Premium | 5,000 | 200 | 5 | 3 (High) | + Real-time updates |
-| Enterprise | 50,000 | 1,000 | 10 | 4 (Maximum) | + Bulk operations |
+| Tier | Hour Limit | Minute Limit | Concurrent | Cache Priority | Price | Features |
+|------|------------|--------------|------------|----------------|-------|----------|
+| Free | 300 | 5 | 1 | 1 (Low) | $0 | Basic API access |
+| ALL-STAR | 3,600 | 60 | 2 | 2 (Medium) | $9.99 | + Player stats, injuries |
+| GOAT | 36,000 | 600 | 5 | 3 (High) | $39.99 | + Box scores, standings, odds |
+| Enterprise | 36,000* | 600* | 10 | 4 (Maximum) | Custom | + Bulk operations |
+
+*Enterprise tier uses GOAT limits until custom plans available*
 
 ## Rate Limiting Implementation
 
@@ -200,10 +202,10 @@ except APIRateLimitError as e:
 stats = auth_manager.get_usage_stats(key_id)
 {
     "total_requests": 1547,
-    "hourly_remaining": 453,
-    "minute_remaining": 8,
-    "tier": "pro",
-    "features": ["basic_stats", "advanced_stats", "historical_data"]
+    "hourly_remaining": 2053,
+    "minute_remaining": 58,
+    "tier": "all-star",
+    "features": ["teams", "players", "games", "player_stats", "active_players", "injuries"]
 }
 
 # All Keys Overview
@@ -223,7 +225,7 @@ HOOPHEAD_ENCRYPTION_KEY=your-32-character-base64-key
 
 # Optional: Additional keys with tier specification
 HOOPHEAD_API_KEYS='[
-  {"key": "backup-key", "tier": "pro", "label": "Backup Production"},
+  {"key": "backup-key", "tier": "all-star", "label": "Backup Production"},
   {"key": "dev-key", "tier": "free", "label": "Development"}
 ]'
 ```

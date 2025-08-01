@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 class APITier(str, Enum):
-    """API access tiers with different rate limits and features."""
+    """API access tiers matching Ball Don't Lie API pricing."""
     FREE = "free"
-    PRO = "pro"
-    PREMIUM = "premium"
-    ENTERPRISE = "enterprise"
+    ALL_STAR = "all-star" 
+    GOAT = "goat"
+    ENTERPRISE = "enterprise"  # Future-proofing for custom plans
 
 
 @dataclass
@@ -72,35 +72,35 @@ class AuthenticationManager:
         
         self.cipher = Fernet(self.encryption_key.encode() if isinstance(self.encryption_key, str) else self.encryption_key)
         
-        # Tier configurations with limits per Ball Don't Lie API documentation
+        # Tier configurations matching Ball Don't Lie API actual limits
         self.tier_limits = {
             APITier.FREE: TierLimits(
-                requests_per_hour=100,
-                requests_per_minute=10,
+                requests_per_hour=300,
+                requests_per_minute=5,
                 concurrent_requests=1,
                 cache_priority=1,
-                features=["basic_stats", "teams", "players"]
+                features=["teams", "players", "games"]
             ),
-            APITier.PRO: TierLimits(
-                requests_per_hour=1000,
-                requests_per_minute=50,
-                concurrent_requests=3,
+            APITier.ALL_STAR: TierLimits(
+                requests_per_hour=3600,
+                requests_per_minute=60,
+                concurrent_requests=2,
                 cache_priority=2,
-                features=["basic_stats", "teams", "players", "advanced_stats", "historical_data"]
+                features=["teams", "players", "games", "player_stats", "active_players", "injuries"]
             ),
-            APITier.PREMIUM: TierLimits(
-                requests_per_hour=5000,
-                requests_per_minute=200,
+            APITier.GOAT: TierLimits(
+                requests_per_hour=36000,
+                requests_per_minute=600,
                 concurrent_requests=5,
                 cache_priority=3,
-                features=["basic_stats", "teams", "players", "advanced_stats", "historical_data", "real_time"]
+                features=["teams", "players", "games", "player_stats", "active_players", "injuries", "box_scores", "standings", "leaders", "betting_odds"]
             ),
             APITier.ENTERPRISE: TierLimits(
-                requests_per_hour=50000,
-                requests_per_minute=1000,
+                requests_per_hour=36000,  # Same as GOAT until custom plans available
+                requests_per_minute=600,
                 concurrent_requests=10,
                 cache_priority=4,
-                features=["basic_stats", "teams", "players", "advanced_stats", "historical_data", "real_time", "bulk_export"]
+                features=["teams", "players", "games", "player_stats", "active_players", "injuries", "box_scores", "standings", "leaders", "betting_odds", "bulk_export"]
             )
         }
         
@@ -155,10 +155,10 @@ class AuthenticationManager:
         # This is a simplified detection - in reality, you'd validate with the API
         if api_key.startswith('ent_'):
             return APITier.ENTERPRISE
-        elif api_key.startswith('prem_'):
-            return APITier.PREMIUM
-        elif api_key.startswith('pro_'):
-            return APITier.PRO
+        elif api_key.startswith('goat_'):
+            return APITier.GOAT
+        elif api_key.startswith('all_star_') or api_key.startswith('allstar_'):
+            return APITier.ALL_STAR
         else:
             return APITier.FREE
     
@@ -299,7 +299,7 @@ class AuthenticationManager:
         
         # For new keys, do basic validation
         # In production, you'd validate against Ball Don't Lie API
-        if api_key.startswith(('bdl_', 'sk_', 'pk_', 'ent_', 'pro_', 'prem_')):
+        if api_key.startswith(('bdl_', 'sk_', 'pk_', 'ent_', 'goat_', 'all_star_', 'allstar_')):
             tier = self._detect_key_tier(api_key)
             return True, None, tier
         

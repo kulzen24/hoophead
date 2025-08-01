@@ -43,7 +43,7 @@ class TestAuthenticationManager:
         # Add key
         key_id = self.auth_manager.add_api_key(
             test_api_key, 
-            APITier.PRO, 
+            APITier.ALL_STAR, 
             "Test Key"
         )
         
@@ -57,7 +57,7 @@ class TestAuthenticationManager:
         # Check key info
         key_info = self.auth_manager.get_key_info(key_id)
         assert key_info is not None
-        assert key_info.tier == APITier.PRO
+        assert key_info.tier == APITier.ALL_STAR
         assert key_info.label == "Test Key"
         assert key_info.is_active is True
     
@@ -65,15 +65,15 @@ class TestAuthenticationManager:
         """Test tier-based rate limiting."""
         # Add keys with different tiers
         free_key = self.auth_manager.add_api_key("free_key_123", APITier.FREE)
-        pro_key = self.auth_manager.add_api_key("pro_key_123", APITier.PRO)
+        allstar_key = self.auth_manager.add_api_key("all_star_key_123", APITier.ALL_STAR)
         
         # Check tier limits
         free_limits = self.auth_manager.get_tier_limits(free_key)
-        pro_limits = self.auth_manager.get_tier_limits(pro_key)
+        allstar_limits = self.auth_manager.get_tier_limits(allstar_key)
         
-        assert free_limits.requests_per_hour == 100
-        assert pro_limits.requests_per_hour == 1000
-        assert pro_limits.requests_per_minute > free_limits.requests_per_minute
+        assert free_limits.requests_per_hour == 300
+        assert allstar_limits.requests_per_hour == 3600
+        assert allstar_limits.requests_per_minute > free_limits.requests_per_minute
     
     async def test_rate_limiting(self):
         """Test rate limiting functionality."""
@@ -83,18 +83,18 @@ class TestAuthenticationManager:
         # Check initial rate limit (should be allowed)
         allowed, info = await self.auth_manager.check_rate_limit(test_key)
         assert allowed is True
-        assert info["hourly_remaining"] == 100
-        assert info["minute_remaining"] == 10
+        assert info["hourly_remaining"] == 300
+        assert info["minute_remaining"] == 5
         
-        # Record some requests
-        for i in range(5):
+        # Record some requests (Free tier allows 5/min, so record 3 to stay under limit)
+        for i in range(3):
             await self.auth_manager.record_request(test_key)
         
         # Check updated limits
         allowed, info = await self.auth_manager.check_rate_limit(test_key)
         assert allowed is True
-        assert info["hourly_remaining"] == 95
-        assert info["minute_remaining"] == 5
+        assert info["hourly_remaining"] == 297
+        assert info["minute_remaining"] == 2
     
     def test_key_validation(self):
         """Test API key validation."""
@@ -102,8 +102,9 @@ class TestAuthenticationManager:
         valid_keys = [
             "bdl_valid_key_123456789",
             "sk_test_123456789",
-            "pro_premium_key_123",
-            "ent_enterprise_key_456"
+            "goat_premium_key_123",
+            "all_star_tier_key_456",
+            "ent_enterprise_key_789"
         ]
         
         for key in valid_keys:
@@ -127,12 +128,12 @@ class TestAuthenticationManager:
     def test_usage_statistics(self):
         """Test usage statistics tracking."""
         # Add a test key
-        key_id = self.auth_manager.add_api_key("stats_test_key", APITier.PRO, "Statistics Test")
+        key_id = self.auth_manager.add_api_key("stats_test_key", APITier.ALL_STAR, "Statistics Test")
         
         # Get initial stats
         stats = self.auth_manager.get_usage_stats(key_id)
         assert stats["total_requests"] == 0
-        assert stats["tier"] == "pro"
+        assert stats["tier"] == "all-star"
         assert stats["label"] == "Statistics Test"
         
         # Record some usage
@@ -200,15 +201,15 @@ class TestBallDontLieClientAuthentication:
         
         # Add keys with different tiers
         free_key_id = auth_manager.add_api_key("free_test_key", APITier.FREE)
-        pro_key_id = auth_manager.add_api_key("pro_test_key", APITier.PRO)
+        goat_key_id = auth_manager.add_api_key("goat_test_key", APITier.GOAT)
         
         # Test rate limits
         free_limits = auth_manager.get_tier_limits(free_key_id)
-        pro_limits = auth_manager.get_tier_limits(pro_key_id)
+        goat_limits = auth_manager.get_tier_limits(goat_key_id)
         
-        assert free_limits.requests_per_hour < pro_limits.requests_per_hour
-        assert free_limits.requests_per_minute < pro_limits.requests_per_minute
-        assert free_limits.concurrent_requests < pro_limits.concurrent_requests
+        assert free_limits.requests_per_hour < goat_limits.requests_per_hour
+        assert free_limits.requests_per_minute < goat_limits.requests_per_minute
+        assert free_limits.concurrent_requests < goat_limits.concurrent_requests
 
 
 async def demo_authentication_features():
@@ -223,16 +224,16 @@ async def demo_authentication_features():
     # Add sample API keys (these are fake keys for demo)
     print("\n2. Adding sample API keys...")
     free_key_id = auth_manager.add_api_key("bdl_free_demo_key_123456789", APITier.FREE, "Demo Free Key")
-    pro_key_id = auth_manager.add_api_key("pro_demo_key_123456789", APITier.PRO, "Demo Pro Key")
-    premium_key_id = auth_manager.add_api_key("prem_demo_key_123456789", APITier.PREMIUM, "Demo Premium Key")
+    allstar_key_id = auth_manager.add_api_key("all_star_demo_key_123456789", APITier.ALL_STAR, "Demo ALL-STAR Key")
+    goat_key_id = auth_manager.add_api_key("goat_demo_key_123456789", APITier.GOAT, "Demo GOAT Key")
     
     print(f"   Added Free Key: {free_key_id}")
-    print(f"   Added Pro Key: {pro_key_id}")
-    print(f"   Added Premium Key: {premium_key_id}")
+    print(f"   Added ALL-STAR Key: {allstar_key_id}")
+    print(f"   Added GOAT Key: {goat_key_id}")
     
     # Show tier limits
-    print("\n3. Tier Limits Comparison:")
-    for key_id, tier_name in [(free_key_id, "FREE"), (pro_key_id, "PRO"), (premium_key_id, "PREMIUM")]:
+    print("\n3. Ball Don't Lie API Tier Limits:")
+    for key_id, tier_name in [(free_key_id, "FREE"), (allstar_key_id, "ALL-STAR"), (goat_key_id, "GOAT")]:
         limits = auth_manager.get_tier_limits(key_id)
         print(f"   {tier_name:8} | {limits.requests_per_hour:5}/hour | {limits.requests_per_minute:3}/min | {limits.concurrent_requests} concurrent")
     
@@ -255,7 +256,7 @@ async def demo_authentication_features():
     print(f"   Default key: {auth_manager.default_key_id}")
     
     # Switch default key
-    auth_manager.set_default_key(pro_key_id)
+    auth_manager.set_default_key(allstar_key_id)
     print(f"   New default: {auth_manager.default_key_id}")
     
     # Deactivate a key
