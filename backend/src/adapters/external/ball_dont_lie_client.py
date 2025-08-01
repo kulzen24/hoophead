@@ -44,13 +44,17 @@ except ImportError:
             }
     settings = MockSettings()
 
-# Optional Redis cache import
+# Import multi-layered cache system
 try:
-    from backend.src.adapters.cache.redis_client import cache as redis_cache
-    REDIS_AVAILABLE = True
+    from backend.src.adapters.cache import multi_cache, CacheStrategy, CacheHitInfo
+    from backend.src.adapters.cache.redis_client import cache as redis_cache  # Keep for backward compatibility
+    CACHE_AVAILABLE = True
 except ImportError:
+    multi_cache = None
     redis_cache = None
-    REDIS_AVAILABLE = False
+    CACHE_AVAILABLE = False
+    class CacheStrategy:
+        LAYERED = "layered"
 
 # Import authentication manager
 try:
@@ -165,15 +169,15 @@ class BallDontLieClient:
         self.max_retries = getattr(settings, 'max_retries', 3)
         self.user_agent = getattr(settings, 'api_user_agent', 'HoopHead/0.1.0')
         
-        # Cache configuration
-        self.cache_enabled = enable_cache and REDIS_AVAILABLE
-        self.cache_ttl = getattr(settings, 'cache_ttl', 3600)
-        self.redis_cache = redis_cache if self.cache_enabled else None
+        # Multi-layered cache configuration
+        self.cache_enabled = enable_cache and CACHE_AVAILABLE
+        self.multi_cache = multi_cache if self.cache_enabled else None
+        self.redis_cache = redis_cache if self.cache_enabled else None  # Keep for backward compatibility
         
         if self.cache_enabled:
-            logger.info("Redis cache enabled for Ball Don't Lie client")
+            logger.info("Multi-layered cache enabled for Ball Don't Lie client (Redis + File)")
         else:
-            logger.info("Redis cache disabled or unavailable")
+            logger.info("Cache disabled or unavailable")
         
     async def __aenter__(self):
         """Async context manager entry."""
@@ -192,9 +196,11 @@ class BallDontLieClient:
             timeout=timeout
         )
         
-        # Initialize Redis cache if enabled
-        if self.cache_enabled and self.redis_cache:
-            await self.redis_cache.connect()
+        # Initialize cache system if enabled
+        if self.cache_enabled:
+            if self.redis_cache:
+                await self.redis_cache.connect()
+            # Multi-cache is initialized automatically
         
         return self
     
@@ -203,9 +209,10 @@ class BallDontLieClient:
         if self.session:
             await self.session.close()
         
-        # Disconnect Redis cache if enabled
+        # Disconnect cache system if enabled
         if self.cache_enabled and self.redis_cache:
             await self.redis_cache.disconnect()
+        # Multi-cache file system doesn't need explicit disconnection
     
     def _get_base_url(self, sport: Sport) -> str:
         """Get the base URL for a specific sport."""
@@ -244,20 +251,52 @@ class BallDontLieClient:
             
             logger.debug(f"Rate limit check passed: {rate_limit_info}")
         
-        # Check cache first if enabled (with tier-based cache priority)
-        if use_cache and self.cache_enabled and self.redis_cache:
+        # Check multi-layered cache first if enabled (tier-based optimization)
+        if use_cache and self.cache_enabled and self.multi_cache:
             try:
-                cached_response = await self.redis_cache.get(sport, endpoint, params)
-                if cached_response:
-                    logger.debug(f"Cache HIT for {sport.value}:{endpoint}")
+                # Get tier information for cache optimization
+                tier = self.tier_info.tier if self.tier_info else None
+                
+                cached_data, hit_info = await self.multi_cache.get(
+                    sport, endpoint, params, tier
+                )
+                
+                if hit_info.hit:
+                    logger.debug(f"Cache HIT ({hit_info.source}) for {sport.value}:{endpoint} "
+                               f"(latency: {hit_info.latency_ms:.1f}ms, age: {hit_info.data_age_seconds:.0f}s)")
+                    
                     # Still record the "request" for usage tracking
                     if self.auth_manager:
                         await self.auth_manager.record_request(self.key_id, success=True)
-                    return cached_response
+                    
+                    # Return cached data in APIResponse format
+                    return APIResponse(
+                        data=cached_data,
+                        success=True,
+                        sport=sport,
+                        meta={
+                            "cached": True,
+                            "cache_source": hit_info.source,
+                            "cache_latency_ms": hit_info.latency_ms,
+                            "data_age_seconds": hit_info.data_age_seconds
+                        }
+                    )
                 else:
                     logger.debug(f"Cache MISS for {sport.value}:{endpoint}")
+                    
             except Exception as e:
-                logger.warning(f"Cache read error: {e}")
+                logger.warning(f"Multi-cache read error: {e}")
+                # Fallback to Redis cache for backward compatibility
+                if self.redis_cache:
+                    try:
+                        cached_response = await self.redis_cache.get(sport, endpoint, params)
+                        if cached_response:
+                            logger.debug(f"Fallback Redis cache HIT for {sport.value}:{endpoint}")
+                            if self.auth_manager:
+                                await self.auth_manager.record_request(self.key_id, success=True)
+                            return cached_response
+                    except Exception as fallback_e:
+                        logger.warning(f"Fallback Redis cache error: {fallback_e}")
         
         # Tier-based rate limiting (more sophisticated than simple delay)
         if self.auth_manager and self.tier_info:
@@ -316,11 +355,24 @@ class BallDontLieClient:
                         if self.auth_manager:
                             await self.auth_manager.record_request(self.key_id, success=True)
                         
-                        # Cache the successful response if enabled
-                        if use_cache and self.cache_enabled and self.redis_cache:
+                        # Cache the successful response using multi-layered system
+                        if use_cache and self.cache_enabled:
                             try:
-                                await self.redis_cache.set(sport, endpoint, api_response, params)
-                                logger.debug(f"Cached response for {sport.value}:{endpoint}")
+                                # Use tier information for intelligent cache strategy
+                                tier = self.tier_info.tier if self.tier_info else None
+                                
+                                if self.multi_cache:
+                                    # Store in multi-layered cache (Redis + File)
+                                    redis_success, file_success = await self.multi_cache.set(
+                                        sport, endpoint, data, params, tier, api_response=api_response
+                                    )
+                                    logger.debug(f"Cached response for {sport.value}:{endpoint} "
+                                               f"(Redis: {redis_success}, File: {file_success})")
+                                elif self.redis_cache:
+                                    # Fallback to Redis only
+                                    await self.redis_cache.set(sport, endpoint, api_response, params)
+                                    logger.debug(f"Fallback cached response for {sport.value}:{endpoint}")
+                                    
                             except Exception as e:
                                 logger.warning(f"Cache write error: {e}")
                         
