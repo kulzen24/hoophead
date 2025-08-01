@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-08-01 13:51:57",
+  "duration_seconds": 0.0006911754608154297,
+  "config": {
+    "run_unit_tests": true,
+    "run_integration_tests": true,
+    "run_e2e_tests": false,
+    "run_performance_tests": false,
+    "use_real_api": false,
+    "generate_coverage": false,
+    "coverage_threshold": 80,
+    "save_results": true,
+    "results_file": "test_results.json",
+    "verbose": false
+  },
+  "results": {
+    "comprehensive": {
+      "status": "completed",
+      "results": [
+        "TestSuiteResult(suite_name='Unit Tests', start_time='2025-08-01T13:51:57.008954', end_time='2025-08-01T13:51:57.009307', total_duration_ms=0.3528594970703125, total_tests=5, passed=2, failed=3, skipped=0, test_results=[TestResult(test_name='Authentication Key Validation', status='passed', duration_ms=0.21314620971679688, error_message=None, details=None), TestResult(test_name='Cache Strategy Selection', status='passed', duration_ms=0.022649765014648438, error_message=None, details=None), TestResult(test_name='API Client Initialization', status='failed', duration_ms=0, error_message='No valid API key available. Add a key using auth_manager.add_api_key() or set BALLDONTLIE_API_KEY environment variable.', details=None), TestResult(test_name='Domain Models Creation', status='failed', duration_ms=0, error_message='Player ID should match', details=None), TestResult(test_name='Domain Services Initialization', status='failed', duration_ms=0, error_message=\"PlayerService.__init__() missing 1 required positional argument: 'api_client'\", details=None)], coverage_summary=None)",
+        "TestSuiteResult(suite_name='Integration Tests', start_time='2025-08-01T13:51:57.009334', end_time='2025-08-01T13:51:57.009344', total_duration_ms=0.010013580322265625, total_tests=5, passed=5, failed=0, skipped=0, test_results=[TestResult(test_name='API + Authentication Integration', status='passed', duration_ms=5.0, error_message=None, details={'note': 'Placeholder for integration testing'}), TestResult(test_name='API + Cache Integration', status='passed', duration_ms=8.0, error_message=None, details={'note': 'Placeholder for integration testing'}), TestResult(test_name='Auth + Cache Integration', status='passed', duration_ms=3.0, error_message=None, details={'note': 'Placeholder for integration testing'}), TestResult(test_name='Domain + API Integration', status='passed', duration_ms=12.0, error_message=None, details={'note': 'Placeholder for integration testing'}), TestResult(test_name='Error Handling Integration', status='passed', duration_ms=7.0, error_message=None, details={'note': 'Placeholder for integration testing'})], coverage_summary=None)",
+        "TestSuiteResult(suite_name='End-to-End Tests', start_time='2025-08-01T13:51:57.009357', end_time='2025-08-01T13:51:57.009386', total_duration_ms=0.029087066650390625, total_tests=8, passed=8, failed=0, skipped=0, test_results=[TestResult(test_name='NBA Complete Workflow', status='passed', duration_ms=15.0, error_message=None, details={'sport': 'nba', 'note': 'Placeholder for E2E testing'}), TestResult(test_name='NFL Complete Workflow', status='passed', duration_ms=15.0, error_message=None, details={'sport': 'nfl', 'note': 'Placeholder for E2E testing'}), TestResult(test_name='MLB Complete Workflow', status='passed', duration_ms=15.0, error_message=None, details={'sport': 'mlb', 'note': 'Placeholder for E2E testing'}), TestResult(test_name='NHL Complete Workflow', status='passed', duration_ms=15.0, error_message=None, details={'sport': 'nhl', 'note': 'Placeholder for E2E testing'}), TestResult(test_name='Multi-Sport Workflow', status='passed', duration_ms=25.0, error_message=None, details={'note': 'Placeholder for multi-sport E2E testing'}), TestResult(test_name='FREE Tier Workflow', status='passed', duration_ms=10.0, error_message=None, details={'tier': 'free', 'note': 'Placeholder for tier E2E testing'}), TestResult(test_name='ALL-STAR Tier Workflow', status='passed', duration_ms=10.0, error_message=None, details={'tier': 'all-star', 'note': 'Placeholder for tier E2E testing'}), TestResult(test_name='GOAT Tier Workflow', status='passed', duration_ms=10.0, error_message=None, details={'tier': 'goat', 'note': 'Placeholder for tier E2E testing'})], coverage_summary=None)",
+        "TestSuiteResult(suite_name='Performance Tests', start_time='2025-08-01T13:51:57.009398', end_time='2025-08-01T13:51:57.009406', total_duration_ms=0.007867813110351562, total_tests=4, passed=3, failed=0, skipped=1, test_results=[TestResult(test_name='Cache Performance Benchmark', status='passed', duration_ms=50.0, error_message=None, details={'avg_latency_ms': 2.5, 'note': 'Placeholder for performance testing'}), TestResult(test_name='API Client Performance Benchmark', status='passed', duration_ms=100.0, error_message=None, details={'avg_response_time_ms': 250, 'note': 'Placeholder for performance testing'}), TestResult(test_name='Authentication Performance Benchmark', status='passed', duration_ms=30.0, error_message=None, details={'avg_validation_time_ms': 0.5, 'note': 'Placeholder for performance testing'}), TestResult(test_name='Load Tests', status='skipped', duration_ms=0, error_message='Real API calls disabled', details=None)], coverage_summary=None)"
+      ],
+      "duration_seconds": 0.0004868507385253906
+    }
+  }
+}
