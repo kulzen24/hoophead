@@ -50,13 +50,13 @@ class Settings(BaseSettings):
     
     # API settings
     api_v1_prefix: str = "/api/v1"
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
+    cors_origins: list = ["http://localhost:3000", "http://localhost:8000"]
     
     # MCP settings
     mcp_server_name: str = "hoophead-mcp"
     mcp_server_version: str = "0.1.0"
     
-    # Logging settings
+    # Logging
     log_level: str = "INFO"
     
     @property
