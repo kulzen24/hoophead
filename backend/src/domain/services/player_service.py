@@ -3,8 +3,23 @@ Player domain service for orchestrating player data retrieval and transformation
 """
 
 import logging
+import sys
 from typing import List, Optional, Dict, Any, Union
 from dataclasses import dataclass
+
+# Add core to path for imports
+sys.path.append('../../core')
+try:
+    from core.exceptions import (
+        PlayerNotFoundError, InvalidSearchCriteriaError, DomainException, ErrorContext
+    )
+    from core.error_handler import with_domain_error_handling, error_handler
+except ImportError:
+    # Fallback if import fails
+    class PlayerNotFoundError(Exception): pass
+    class InvalidSearchCriteriaError(Exception): pass
+    class DomainException(Exception): pass
+    def with_domain_error_handling(*args, **kwargs): return lambda f: f
 
 from ..models.base import SportType
 from ..models.player import Player, PlayerStats, PlayerPosition
@@ -35,6 +50,7 @@ class PlayerService:
         """Initialize with API client dependency."""
         self.api_client = api_client
         
+    @with_domain_error_handling(fallback_value=None, suppress_hoophead_errors=True)
     async def get_player_by_id(self, player_id: int, sport: SportType) -> Optional[Player]:
         """
         Retrieve a player by ID and sport.
@@ -44,30 +60,50 @@ class PlayerService:
             sport: Sport type to search in
             
         Returns:
-            Player object or None if not found
+            Player object
+            
+        Raises:
+            PlayerNotFoundError: If player cannot be found
+            DomainException: For other unexpected errors
         """
-        try:
-            # Use the API client to get player data
-            response = await self.api_client.get_players(
-                sport=sport, 
-                search=str(player_id),
-                use_cache=True
+        if not isinstance(player_id, int) or player_id <= 0:
+            raise InvalidSearchCriteriaError(
+                criteria="player_id",
+                reason="Must be a positive integer",
+                context=ErrorContext(
+                    operation="get_player_by_id",
+                    sport=sport.value,
+                    parameters={"player_id": player_id}
+                )
             )
+        
+        # Use the API client to get player data
+        response = await self.api_client.get_players(
+            sport=sport, 
+            search=str(player_id),
+            use_cache=True
+        )
+        
+        if response.success and response.data.get('data'):
+            players_data = response.data['data']
             
-            if response.success and response.data.get('data'):
-                players_data = response.data['data']
-                
-                # Find player with matching ID
-                for player_data in players_data:
-                    if player_data.get('id') == player_id:
-                        return Player.from_api_response({'data': player_data}, sport)
-                        
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error retrieving player {player_id} for {sport}: {e}")
-            return None
+            # Find player with matching ID
+            for player_data in players_data:
+                if player_data.get('id') == player_id:
+                    return Player.from_api_response({'data': player_data}, sport)
+        
+        # If we get here, player was not found
+        raise PlayerNotFoundError(
+            player_id=player_id,
+            sport=sport.value,
+            context=ErrorContext(
+                operation="get_player_by_id",
+                sport=sport.value,
+                parameters={"player_id": player_id}
+            )
+        )
     
+    @with_domain_error_handling(fallback_value=[])
     async def search_players(self, criteria: PlayerSearchCriteria) -> List[Player]:
         """
         Search for players based on criteria.
@@ -77,20 +113,36 @@ class PlayerService:
             
         Returns:
             List of matching players
+            
+        Raises:
+            InvalidSearchCriteriaError: If search criteria are invalid
+            DomainException: For other unexpected errors
         """
+        # Validate search criteria
+        if not criteria.name and not criteria.team_id and not criteria.team_name:
+            raise InvalidSearchCriteriaError(
+                criteria="search_parameters",
+                reason="At least one search parameter (name, team_id, or team_name) must be provided",
+                context=ErrorContext(
+                    operation="search_players",
+                    sport=criteria.sport.value if criteria.sport else "all",
+                    parameters={"criteria": criteria.__dict__}
+                )
+            )
+        
         players = []
         
-        try:
-            # Determine which sports to search
-            sports_to_search = [criteria.sport] if criteria.sport else list(SportType)
-            
-            for sport in sports_to_search:
+        # Determine which sports to search
+        sports_to_search = [criteria.sport] if criteria.sport else list(SportType)
+        
+        for sport in sports_to_search:
+            try:
                 sport_players = await self._search_players_in_sport(sport, criteria)
                 players.extend(sport_players)
+            except Exception as e:
+                logger.warning(f"Error searching players in {sport}: {e}")
+                continue
                 
-        except Exception as e:
-            logger.error(f"Error searching players: {e}")
-            
         return players
     
     async def _search_players_in_sport(self, sport: SportType, criteria: PlayerSearchCriteria) -> List[Player]:

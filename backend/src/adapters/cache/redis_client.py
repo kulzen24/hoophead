@@ -6,6 +6,7 @@ import asyncio
 import json
 import gzip
 import logging
+import sys
 from typing import Any, Dict, Optional, Union
 from dataclasses import dataclass, asdict
 import redis.asyncio as redis
@@ -22,6 +23,23 @@ except ImportError:
         def redis_connection_kwargs(self):
             return {'host': 'localhost', 'port': 6379, 'db': 0, 'decode_responses': True}
     settings = MockSettings()
+
+# Import our error handling system
+sys.path.append('../../core')
+try:
+    from core.exceptions import (
+        CacheException, CacheConnectionError, CacheTimeoutError, 
+        CacheSerializationError, ErrorContext
+    )
+    from core.error_handler import with_api_error_handling
+except ImportError:
+    # Fallback if import fails
+    class CacheException(Exception): pass
+    class CacheConnectionError(Exception): pass
+    class CacheTimeoutError(Exception): pass
+    class CacheSerializationError(Exception): pass
+    class ErrorContext: pass
+    def with_api_error_handling(*args, **kwargs): return lambda f: f
 
 logger = logging.getLogger(__name__)
 
