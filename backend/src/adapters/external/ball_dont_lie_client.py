@@ -12,6 +12,17 @@ import time
 from dataclasses import dataclass
 import os
 
+# Add import for our new error handling system
+import sys
+sys.path.append('/'.join(__file__.split('/')[:-4]))
+
+from core.exceptions import (
+    APIConnectionError, APITimeoutError, APIRateLimitError, 
+    APIAuthenticationError, APINotFoundError, APIServerError, 
+    APIResponseError, ErrorContext
+)
+from core.error_handler import with_api_error_handling, error_handler
+
 try:
     from backend.config.settings import settings
 except ImportError:
@@ -186,6 +197,15 @@ class BallDontLieClient:
         base_url = self._get_base_url(sport)
         url = f"{base_url}/{endpoint.lstrip('/')}"
         
+        # Create error context for detailed error tracking
+        context = ErrorContext(
+            operation="api_request",
+            sport=sport.value,
+            endpoint=endpoint,
+            parameters=params,
+            user_agent=self.user_agent
+        )
+        
         for attempt in range(self.max_retries):
             try:
                 logger.info(f"Making request to {url} (attempt {attempt + 1}) with params: {params}")
@@ -217,52 +237,67 @@ class BallDontLieClient:
                         return api_response
                         
                     elif response.status == 401:
-                        error_msg = "API key authentication failed"
-                        logger.error(f"{error_msg} for {sport.value}")
-                        return APIResponse(data=None, success=False, error=error_msg, sport=sport)
+                        raise APIAuthenticationError(context=context)
                         
                     elif response.status == 429:
-                        error_msg = "Rate limit exceeded"
-                        logger.warning(f"{error_msg} for {sport.value}, retrying...")
+                        retry_after = response.headers.get('Retry-After')
+                        retry_seconds = int(retry_after) if retry_after else None
                         if attempt < self.max_retries - 1:
-                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                            sleep_time = retry_seconds or (2 ** attempt)
+                            logger.warning(f"Rate limit hit for {sport.value}, retrying in {sleep_time}s...")
+                            await asyncio.sleep(sleep_time)
                             continue
-                        return APIResponse(data=None, success=False, error=error_msg, sport=sport)
+                        raise APIRateLimitError(retry_after=retry_seconds, context=context)
                         
                     elif response.status == 404:
-                        error_msg = f"Endpoint {endpoint} not found for {sport.value}"
-                        logger.warning(error_msg)
-                        return APIResponse(data=None, success=False, error=error_msg, sport=sport)
+                        raise APINotFoundError(resource=f"{sport.value}:{endpoint}", context=context)
                         
                     else:
-                        error_msg = f"HTTP {response.status} error"
-                        logger.error(f"{error_msg} for {sport.value}")
-                        if attempt < self.max_retries - 1:
-                            await asyncio.sleep(1)
-                            continue
-                        return APIResponse(data=None, success=False, error=error_msg, sport=sport)
+                        # Handle other HTTP errors
+                        response_data = None
+                        try:
+                            response_data = await response.json()
+                        except:
+                            pass
+                        
+                        if 500 <= response.status < 600:
+                            # Server errors - retryable
+                            if attempt < self.max_retries - 1:
+                                logger.warning(f"Server error {response.status} for {sport.value}, retrying...")
+                                await asyncio.sleep(1)
+                                continue
+                            raise APIServerError(
+                                status_code=response.status,
+                                response_data=response_data,
+                                context=context
+                            )
+                        else:
+                            # Client errors - not retryable
+                            raise APIServerError(
+                                status_code=response.status,
+                                response_data=response_data,
+                                context=context
+                            )
                         
             except asyncio.TimeoutError:
-                error_msg = "Request timeout"
-                logger.error(f"{error_msg} for {sport.value}")
                 if attempt < self.max_retries - 1:
+                    logger.warning(f"Request timeout for {sport.value}, retrying...")
                     await asyncio.sleep(1)
                     continue
-                return APIResponse(data=None, success=False, error=error_msg, sport=sport)
+                raise APITimeoutError(timeout=30.0, context=context)
                 
             except Exception as e:
-                error_msg = f"Unexpected error: {str(e)}"
-                logger.error(f"{error_msg} for {sport.value}")
                 if attempt < self.max_retries - 1:
+                    logger.warning(f"Unexpected error for {sport.value}: {e}, retrying...")
                     await asyncio.sleep(1)
                     continue
-                return APIResponse(data=None, success=False, error=error_msg, sport=sport)
+                raise APIConnectionError(url=url, context=context, original_error=e)
         
-        return APIResponse(
-            data=None, 
-            success=False, 
-            error=f"Failed after {self.max_retries} attempts",
-            sport=sport
+        # This should not be reached due to the exceptions above, but safety fallback
+        raise APIConnectionError(
+            url=url, 
+            context=context, 
+            original_error=Exception(f"Failed after {self.max_retries} attempts")
         )
     
     # Sport-specific methods
