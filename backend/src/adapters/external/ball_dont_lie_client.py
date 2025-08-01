@@ -5,7 +5,7 @@ Supports NBA, NFL, MLB, NHL, and EPL leagues with proper routing and caching.
 import asyncio
 import logging
 import json
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Tuple
 from enum import Enum
 import aiohttp
 import time
@@ -52,6 +52,17 @@ except ImportError:
     redis_cache = None
     REDIS_AVAILABLE = False
 
+# Import authentication manager
+try:
+    from .auth_manager import auth_manager, APITier, AuthenticationManager
+    AUTH_MANAGER_AVAILABLE = True
+except ImportError:
+    # Fallback if auth manager is not available
+    auth_manager = None
+    AUTH_MANAGER_AVAILABLE = False
+    class APITier:
+        FREE = "free"
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,22 +91,63 @@ class BallDontLieClient:
     Handles authentication, rate limiting, caching, and sport-specific routing.
     """
     
-    def __init__(self, api_key: Optional[str] = None, enable_cache: bool = True):
-        """Initialize the multi-sport API client."""
-        # Get API key from parameter, settings, or environment
-        if api_key:
-            self.api_key = api_key
+    def __init__(self, api_key: Optional[str] = None, enable_cache: bool = True, key_id: Optional[str] = None):
+        """Initialize the multi-sport API client with enhanced authentication."""
+        # Use authentication manager if available
+        if AUTH_MANAGER_AVAILABLE and auth_manager:
+            if api_key:
+                # Validate and potentially add new API key
+                is_valid, existing_key_id, tier = auth_manager.validate_api_key(api_key)
+                if not is_valid:
+                    raise ValueError(f"Invalid Ball Don't Lie API key format: {api_key[:10]}...")
+                
+                if not existing_key_id:
+                    # Add new key to manager
+                    self.key_id = auth_manager.add_api_key(api_key, tier or APITier.FREE)
+                else:
+                    self.key_id = existing_key_id
+            else:
+                # Use provided key_id or default
+                self.key_id = key_id
+                if not self.key_id:
+                    # Get default key from manager
+                    self.api_key = auth_manager.get_api_key()
+                    self.key_id = auth_manager.default_key_id
+                    if not self.api_key:
+                        raise ValueError(
+                            "No valid API key available. "
+                            "Add a key using auth_manager.add_api_key() or set BALLDONTLIE_API_KEY environment variable."
+                        )
+                else:
+                    # Get key by ID
+                    self.api_key = auth_manager.get_api_key(self.key_id)
+                    if not self.api_key:
+                        raise ValueError(f"API key with ID {self.key_id} not found or inactive.")
+            
+            # Get current API key for requests
+            self.api_key = auth_manager.get_api_key(self.key_id)
+            self.auth_manager = auth_manager
+            self.tier_info = auth_manager.get_key_info(self.key_id)
+            logger.info(f"Initialized client with {self.tier_info.tier.value if self.tier_info else 'unknown'} tier API key")
         else:
-            self.api_key = (
-                getattr(settings, 'balldontlie_api_key', '') or 
-                os.getenv('BALLDONTLIE_API_KEY', '')
-            )
-        
-        if not self.api_key:
-            raise ValueError(
-                "Ball Don't Lie API key is required. "
-                "Provide it as parameter or set BALLDONTLIE_API_KEY environment variable."
-            )
+            # Fallback to original behavior
+            if api_key:
+                self.api_key = api_key
+            else:
+                self.api_key = (
+                    getattr(settings, 'balldontlie_api_key', '') or 
+                    os.getenv('BALLDONTLIE_API_KEY', '')
+                )
+            
+            if not self.api_key:
+                raise ValueError(
+                    "Ball Don't Lie API key is required. "
+                    "Provide it as parameter or set BALLDONTLIE_API_KEY environment variable."
+                )
+            
+            self.key_id = None
+            self.auth_manager = None
+            self.tier_info = None
         
         # Get sport-specific base URLs from settings
         self.sport_base_urls = getattr(settings, 'sport_base_urls', {
@@ -173,23 +225,57 @@ class BallDontLieClient:
     ) -> APIResponse:
         """Make a rate-limited HTTP request to the sport-specific API with caching."""
         
-        # Check cache first if enabled
+        # Check tier-based rate limits if authentication manager is available
+        if self.auth_manager:
+            allowed, rate_limit_info = await self.auth_manager.check_rate_limit(self.key_id)
+            if not allowed:
+                error_msg = f"Rate limit exceeded for {self.tier_info.tier.value if self.tier_info else 'unknown'} tier"
+                raise APIRateLimitError(
+                    retry_after=min(
+                        rate_limit_info.get('minute_reset', 60) - time.time(),
+                        rate_limit_info.get('hourly_reset', 3600) - time.time()
+                    ),
+                    context=ErrorContext(
+                        operation="rate_limit_check",
+                        rate_limit_info=rate_limit_info,
+                        key_id=self.key_id
+                    )
+                )
+            
+            logger.debug(f"Rate limit check passed: {rate_limit_info}")
+        
+        # Check cache first if enabled (with tier-based cache priority)
         if use_cache and self.cache_enabled and self.redis_cache:
             try:
                 cached_response = await self.redis_cache.get(sport, endpoint, params)
                 if cached_response:
                     logger.debug(f"Cache HIT for {sport.value}:{endpoint}")
+                    # Still record the "request" for usage tracking
+                    if self.auth_manager:
+                        await self.auth_manager.record_request(self.key_id, success=True)
                     return cached_response
                 else:
                     logger.debug(f"Cache MISS for {sport.value}:{endpoint}")
             except Exception as e:
                 logger.warning(f"Cache read error: {e}")
         
-        # Rate limiting
-        current_time = time.time()
-        time_since_last = current_time - self.last_request_time
-        if time_since_last < self.min_request_interval:
-            await asyncio.sleep(self.min_request_interval - time_since_last)
+        # Tier-based rate limiting (more sophisticated than simple delay)
+        if self.auth_manager and self.tier_info:
+            # Use tier-specific rate limiting
+            tier_limits = self.auth_manager.get_tier_limits(self.key_id)
+            if tier_limits:
+                # Calculate dynamic delay based on tier
+                base_delay = 60.0 / tier_limits.requests_per_minute  # Minimum time between requests
+                current_time = time.time()
+                time_since_last = current_time - self.last_request_time
+                if time_since_last < base_delay:
+                    await asyncio.sleep(base_delay - time_since_last)
+        else:
+            # Fallback to original rate limiting
+            current_time = time.time()
+            time_since_last = current_time - self.last_request_time
+            if time_since_last < self.min_request_interval:
+                await asyncio.sleep(self.min_request_interval - time_since_last)
         
         self.last_request_time = time.time()
         
@@ -226,6 +312,10 @@ class BallDontLieClient:
                             }
                         )
                         
+                        # Record successful request in authentication manager
+                        if self.auth_manager:
+                            await self.auth_manager.record_request(self.key_id, success=True)
+                        
                         # Cache the successful response if enabled
                         if use_cache and self.cache_enabled and self.redis_cache:
                             try:
@@ -237,6 +327,9 @@ class BallDontLieClient:
                         return api_response
                         
                     elif response.status == 401:
+                        # Record failed authentication in manager
+                        if self.auth_manager:
+                            await self.auth_manager.record_request(self.key_id, success=False)
                         raise APIAuthenticationError(context=context)
                         
                     elif response.status == 429:
@@ -338,6 +431,84 @@ class BallDontLieClient:
             return await self.redis_cache.get_cache_stats()
         return {"cache_enabled": False}
     
+    # Authentication and usage management methods
+    def get_authentication_info(self) -> Dict[str, Any]:
+        """Get current authentication information and usage stats."""
+        if not self.auth_manager:
+            return {"auth_manager_enabled": False}
+        
+        return {
+            "auth_manager_enabled": True,
+            "current_key_id": self.key_id,
+            "usage_stats": self.auth_manager.get_usage_stats(self.key_id),
+            "all_keys": self.auth_manager.list_api_keys()
+        }
+    
+    def switch_api_key(self, key_id: str) -> bool:
+        """Switch to a different API key."""
+        if not self.auth_manager:
+            logger.warning("Authentication manager not available")
+            return False
+        
+        new_key = self.auth_manager.get_api_key(key_id)
+        if not new_key:
+            logger.error(f"API key {key_id} not found or inactive")
+            return False
+        
+        self.key_id = key_id
+        self.api_key = new_key
+        self.tier_info = self.auth_manager.get_key_info(key_id)
+        
+        logger.info(f"Switched to API key {key_id} ({self.tier_info.tier.value if self.tier_info else 'unknown'} tier)")
+        return True
+    
+    def add_api_key(self, api_key: str, tier: Optional[str] = None, label: Optional[str] = None) -> Optional[str]:
+        """Add a new API key to the authentication manager."""
+        if not self.auth_manager:
+            logger.warning("Authentication manager not available")
+            return None
+        
+        try:
+            tier_enum = APITier(tier) if tier else APITier.FREE
+            key_id = self.auth_manager.add_api_key(api_key, tier_enum, label)
+            logger.info(f"Added new API key {key_id} with tier {tier_enum.value}")
+            return key_id
+        except Exception as e:
+            logger.error(f"Error adding API key: {e}")
+            return None
+    
+    async def validate_current_key(self) -> Tuple[bool, Dict[str, Any]]:
+        """Validate the current API key by making a test request."""
+        try:
+            # Make a simple test request (get NBA teams with minimal params)
+            test_response = await self.get_teams(Sport.NBA, use_cache=False)
+            
+            validation_result = {
+                "valid": test_response.success,
+                "key_id": self.key_id,
+                "tier": self.tier_info.tier.value if self.tier_info else "unknown",
+                "test_endpoint": "teams",
+                "response_meta": test_response.meta
+            }
+            
+            if self.auth_manager:
+                validation_result["usage_stats"] = self.auth_manager.get_usage_stats(self.key_id)
+            
+            return test_response.success, validation_result
+            
+        except APIAuthenticationError:
+            return False, {
+                "valid": False,
+                "error": "Authentication failed - API key may be invalid or expired",
+                "key_id": self.key_id
+            }
+        except Exception as e:
+            return False, {
+                "valid": False,
+                "error": f"Validation failed: {str(e)}",
+                "key_id": self.key_id
+            }
+    
     # Multi-sport convenience methods
     async def search_players_across_sports(
         self, 
@@ -399,13 +570,22 @@ class BallDontLieClient:
 
 
 # Convenience functions for quick testing
-async def quick_player_search(search_term: str, api_key: Optional[str] = None, use_cache: bool = True) -> Dict[Sport, APIResponse]:
-    """Quick multi-sport player search."""
-    async with BallDontLieClient(api_key, enable_cache=use_cache) as client:
+async def quick_player_search(search_term: str, api_key: Optional[str] = None, key_id: Optional[str] = None, use_cache: bool = True) -> Dict[Sport, APIResponse]:
+    """Quick multi-sport player search with enhanced authentication."""
+    async with BallDontLieClient(api_key, enable_cache=use_cache, key_id=key_id) as client:
         return await client.search_players_across_sports(search_term, use_cache=use_cache)
 
 
-async def quick_teams_all_sports(api_key: Optional[str] = None, use_cache: bool = True) -> Dict[Sport, APIResponse]:
-    """Quick team fetch for all sports."""
-    async with BallDontLieClient(api_key, enable_cache=use_cache) as client:
-        return await client.get_all_teams(use_cache=use_cache) 
+async def quick_teams_all_sports(api_key: Optional[str] = None, key_id: Optional[str] = None, use_cache: bool = True) -> Dict[Sport, APIResponse]:
+    """Quick team fetch for all sports with enhanced authentication."""
+    async with BallDontLieClient(api_key, enable_cache=use_cache, key_id=key_id) as client:
+        return await client.get_all_teams(use_cache=use_cache)
+
+
+async def validate_api_key_quick(api_key: str) -> Tuple[bool, Dict[str, Any]]:
+    """Quick API key validation test."""
+    try:
+        async with BallDontLieClient(api_key, enable_cache=False) as client:
+            return await client.validate_current_key()
+    except Exception as e:
+        return False, {"valid": False, "error": str(e)} 
