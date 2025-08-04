@@ -14,7 +14,8 @@ from typing import Dict, List, Any
 import json
 
 # Add backend source to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend', 'src'))
+from test_utils import setup_test_environment
+setup_test_environment()
 
 # Import test suites
 try:

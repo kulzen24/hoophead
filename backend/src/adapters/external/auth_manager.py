@@ -13,6 +13,13 @@ from dataclasses import dataclass, asdict
 from cryptography.fernet import Fernet
 import asyncio
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not available, use system env vars only
+
 logger = logging.getLogger(__name__)
 
 

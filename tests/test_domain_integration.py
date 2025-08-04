@@ -8,7 +8,8 @@ import sys
 import os
 
 # Add backend src to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend', 'src'))
+from test_utils import setup_test_environment
+setup_test_environment()
 
 from adapters.external.ball_dont_lie_client import BallDontLieClient, Sport
 from domain.models.base import SportType
@@ -28,8 +29,10 @@ class TestDomainIntegration:
             
             # Test search players
             criteria = PlayerSearchCriteria(name="James", sport=SportType.NBA)
-            players = await player_service.search_players(criteria)
+            search_response = await player_service.search_players(criteria)
             
+            assert search_response.success, f"Search failed: {search_response.error}"
+            players = search_response.data
             assert isinstance(players, list)
             print(f"Found {len(players)} players with 'James' in NBA")
             

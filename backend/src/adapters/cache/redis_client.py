@@ -25,7 +25,9 @@ except ImportError:
     settings = MockSettings()
 
 # Import our error handling system
-sys.path.append('../../core')
+from core.utils import PathManager, LoggerFactory
+PathManager.setup_core_path()
+
 try:
     from core.exceptions import (
         CacheException, CacheConnectionError, CacheTimeoutError, 

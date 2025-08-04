@@ -5,6 +5,7 @@ Contains exceptions, utilities, and common functionality.
 
 from .exceptions import *
 from .error_handler import ErrorHandler, ErrorContext
+from .utils import *
 
 __all__ = [
     # Base exceptions
@@ -39,4 +40,15 @@ __all__ = [
     # Error handler
     "ErrorHandler",
     "ErrorContext",
+    
+    # Utilities
+    "PathManager",
+    "LoggerFactory", 
+    "APIResponseProcessor",
+    "AsyncPatterns",
+    "CacheKeyBuilder",
+    "DataValidator",
+    "EnvironmentManager",
+    "PROJECT_ROOT",
+    "BACKEND_SRC"
 ] 
