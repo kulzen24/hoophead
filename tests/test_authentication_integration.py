@@ -8,9 +8,16 @@ import pytest
 import logging
 from typing import Dict, Any
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not available, use system env vars only
+
 # Set up test environment
-import sys
-sys.path.append('../backend/src')
+from test_utils import setup_test_environment
+setup_test_environment()
 
 try:
     from adapters.external.auth_manager import AuthenticationManager, APITier

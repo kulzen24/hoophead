@@ -11,6 +11,13 @@ from pathlib import Path
 from unittest.mock import patch, AsyncMock
 from typing import Dict, Any
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not available, use system env vars only
+
 # Add backend to path
 backend_path = Path(__file__).parent.parent / "backend"
 sys.path.append(str(backend_path))

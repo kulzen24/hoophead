@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend', 'src
 # Import system components
 from adapters.external.ball_dont_lie_client import BallDontLieClient, Sport
 from adapters.external.auth_manager import AuthenticationManager, APITier
-from adapters.cache import multi_cache, cache_warmer
+from adapters.cache import multi_cache
 from domain.services.player_service import PlayerService
 from domain.services.team_service import TeamService
 

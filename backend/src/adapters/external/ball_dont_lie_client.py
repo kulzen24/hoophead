@@ -12,9 +12,16 @@ import time
 from dataclasses import dataclass
 import os
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not available, use system env vars only
+
 # Add import for our new error handling system
-import sys
-sys.path.append('/'.join(__file__.split('/')[:-4]))
+from core.utils import PathManager, LoggerFactory, EnvironmentManager
+PathManager.setup_backend_path()
 
 from core.exceptions import (
     APIConnectionError, APITimeoutError, APIRateLimitError, 

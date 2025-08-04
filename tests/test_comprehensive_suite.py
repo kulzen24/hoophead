@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend', 'src
 
 # Import test modules
 try:
-    from test_authentication_integration import TestAuthenticationIntegration
+    from test_authentication_integration import TestAuthenticationManager, TestBallDontLieClientAuthentication
     from test_multi_layered_caching import TestMultiLayeredCaching
     from test_error_handling import TestErrorHandling
     from test_domain_integration import TestDomainIntegration

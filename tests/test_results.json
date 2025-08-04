@@ -1,0 +1,44 @@
+{
+  "timestamp": "2025-08-01 15:22:39",
+  "duration_seconds": 1.6596550941467285,
+  "config": {
+    "run_unit_tests": true,
+    "run_integration_tests": true,
+    "run_e2e_tests": false,
+    "run_performance_tests": true,
+    "use_real_api": false,
+    "generate_coverage": false,
+    "coverage_threshold": 80,
+    "save_results": true,
+    "results_file": "test_results.json",
+    "verbose": true
+  },
+  "results": {
+    "comprehensive": {
+      "status": "completed",
+      "results": [
+        "TestSuiteResult(suite_name='Unit Tests', start_time='2025-08-01T15:22:37.932850', end_time='2025-08-01T15:22:37.934189', total_duration_ms=1.3391971588134766, total_tests=5, passed=3, failed=2, skipped=0, test_results=[TestResult(test_name='Authentication Key Validation', status='passed', duration_ms=0.4391670227050781, error_message=None, details=None), TestResult(test_name='Cache Strategy Selection', status='passed', duration_ms=0.018835067749023438, error_message=None, details=None), TestResult(test_name='API Client Initialization', status='passed', duration_ms=0.7550716400146484, error_message=None, details=None), TestResult(test_name='Domain Models Creation', status='failed', duration_ms=0, error_message='Player ID should match', details=None), TestResult(test_name='Domain Services Initialization', status='failed', duration_ms=0, error_message=\"PlayerService.__init__() missing 1 required positional argument: 'api_client'\", details=None)], coverage_summary=None)",
+        "TestSuiteResult(suite_name='Integration Tests', start_time='2025-08-01T15:22:37.934234', end_time='2025-08-01T15:22:37.934245', total_duration_ms=0.010967254638671875, total_tests=5, passed=5, failed=0, skipped=0, test_results=[TestResult(test_name='API + Authentication Integration', status='passed', duration_ms=5.0, error_message=None, details={'note': 'Placeholder for integration testing'}), TestResult(test_name='API + Cache Integration', status='passed', duration_ms=8.0, error_message=None, details={'note': 'Placeholder for integration testing'}), TestResult(test_name='Auth + Cache Integration', status='passed', duration_ms=3.0, error_message=None, details={'note': 'Placeholder for integration testing'}), TestResult(test_name='Domain + API Integration', status='passed', duration_ms=12.0, error_message=None, details={'note': 'Placeholder for integration testing'}), TestResult(test_name='Error Handling Integration', status='passed', duration_ms=7.0, error_message=None, details={'note': 'Placeholder for integration testing'})], coverage_summary=None)",
+        "TestSuiteResult(suite_name='End-to-End Tests', start_time='2025-08-01T15:22:37.934270', end_time='2025-08-01T15:22:37.934297', total_duration_ms=0.027179718017578125, total_tests=8, passed=8, failed=0, skipped=0, test_results=[TestResult(test_name='NBA Complete Workflow', status='passed', duration_ms=15.0, error_message=None, details={'sport': 'nba', 'note': 'Placeholder for E2E testing'}), TestResult(test_name='NFL Complete Workflow', status='passed', duration_ms=15.0, error_message=None, details={'sport': 'nfl', 'note': 'Placeholder for E2E testing'}), TestResult(test_name='MLB Complete Workflow', status='passed', duration_ms=15.0, error_message=None, details={'sport': 'mlb', 'note': 'Placeholder for E2E testing'}), TestResult(test_name='NHL Complete Workflow', status='passed', duration_ms=15.0, error_message=None, details={'sport': 'nhl', 'note': 'Placeholder for E2E testing'}), TestResult(test_name='Multi-Sport Workflow', status='passed', duration_ms=25.0, error_message=None, details={'note': 'Placeholder for multi-sport E2E testing'}), TestResult(test_name='FREE Tier Workflow', status='passed', duration_ms=10.0, error_message=None, details={'tier': 'free', 'note': 'Placeholder for tier E2E testing'}), TestResult(test_name='ALL-STAR Tier Workflow', status='passed', duration_ms=10.0, error_message=None, details={'tier': 'all-star', 'note': 'Placeholder for tier E2E testing'}), TestResult(test_name='GOAT Tier Workflow', status='passed', duration_ms=10.0, error_message=None, details={'tier': 'goat', 'note': 'Placeholder for tier E2E testing'})], coverage_summary=None)",
+        "TestSuiteResult(suite_name='Performance Tests', start_time='2025-08-01T15:22:37.934321', end_time='2025-08-01T15:22:37.934329', total_duration_ms=0.008106231689453125, total_tests=4, passed=3, failed=0, skipped=1, test_results=[TestResult(test_name='Cache Performance Benchmark', status='passed', duration_ms=50.0, error_message=None, details={'avg_latency_ms': 2.5, 'note': 'Placeholder for performance testing'}), TestResult(test_name='API Client Performance Benchmark', status='passed', duration_ms=100.0, error_message=None, details={'avg_response_time_ms': 250, 'note': 'Placeholder for performance testing'}), TestResult(test_name='Authentication Performance Benchmark', status='passed', duration_ms=30.0, error_message=None, details={'avg_validation_time_ms': 0.5, 'note': 'Placeholder for performance testing'}), TestResult(test_name='Load Tests', status='skipped', duration_ms=0, error_message='Real API calls disabled', details=None)], coverage_summary=None)"
+      ],
+      "duration_seconds": 0.0018677711486816406
+    },
+    "performance": {
+      "status": "completed",
+      "results": {
+        "performance_metrics": [
+          "PerformanceMetrics(test_name='Cache Performance Benchmark', total_duration_ms=399.8901844024658, min_latency_ms=0.9179115295410156, max_latency_ms=4.203081130981445, avg_latency_ms=1.5803074836730957, median_latency_ms=1.2630224227905273, p95_latency_ms=3.6690235137939453, p99_latency_ms=4.203081130981445, throughput_requests_per_second=250.0686535965482, success_rate=100.0, cache_hit_rate=100.0, memory_usage_mb=0.3125, cpu_usage_percent=-5.300000000000001, errors=[])",
+          "PerformanceMetrics(test_name='API Client Performance Benchmark', total_duration_ms=0.027894973754882812, min_latency_ms=0, max_latency_ms=0, avg_latency_ms=0, median_latency_ms=0, p95_latency_ms=0, p99_latency_ms=0, throughput_requests_per_second=0, success_rate=0, cache_hit_rate=0, memory_usage_mb=0, cpu_usage_percent=0, errors=['API client performance test error: API key with ID abb767fc5843d4b2 not found or inactive.'])",
+          "PerformanceMetrics(test_name='Authentication Performance Benchmark', total_duration_ms=4.791975021362305, min_latency_ms=0.00095367431640625, max_latency_ms=0.052928924560546875, avg_latency_ms=0.003943204879760742, median_latency_ms=0.00286102294921875, p95_latency_ms=0.010013580322265625, p99_latency_ms=0.017881393432617188, throughput_requests_per_second=208682.22299616897, success_rate=100.0, cache_hit_rate=0, memory_usage_mb=0.02734375, cpu_usage_percent=17.4, errors=[])"
+        ],
+        "load_test_results": [
+          "LoadTestResult(scenario_name='Concurrent Load Test (1 users)', concurrent_users=1, total_requests=0, successful_requests=0, failed_requests=0, duration_seconds=0.000492095947265625, throughput_rps=0.0, latency_metrics=PerformanceMetrics(test_name='Load Test Latencies (1 users)', total_duration_ms=0.492095947265625, min_latency_ms=0, max_latency_ms=0, avg_latency_ms=0, median_latency_ms=0, p95_latency_ms=0, p99_latency_ms=0, throughput_requests_per_second=0, success_rate=0, cache_hit_rate=0, memory_usage_mb=0, cpu_usage_percent=0, errors=[]), resource_usage={'memory_increase_mb': 0.0, 'cpu_usage_change': -7.200000000000001})",
+          "LoadTestResult(scenario_name='Concurrent Load Test (3 users)', concurrent_users=3, total_requests=0, successful_requests=0, failed_requests=0, duration_seconds=0.0004470348358154297, throughput_rps=0.0, latency_metrics=PerformanceMetrics(test_name='Load Test Latencies (3 users)', total_duration_ms=0.4470348358154297, min_latency_ms=0, max_latency_ms=0, avg_latency_ms=0, median_latency_ms=0, p95_latency_ms=0, p99_latency_ms=0, throughput_requests_per_second=0, success_rate=0, cache_hit_rate=0, memory_usage_mb=0, cpu_usage_percent=0, errors=[]), resource_usage={'memory_increase_mb': 0.0, 'cpu_usage_change': 0.0})",
+          "LoadTestResult(scenario_name='Concurrent Load Test (5 users)', concurrent_users=5, total_requests=0, successful_requests=0, failed_requests=0, duration_seconds=0.00038313865661621094, throughput_rps=0.0, latency_metrics=PerformanceMetrics(test_name='Load Test Latencies (5 users)', total_duration_ms=0.38313865661621094, min_latency_ms=0, max_latency_ms=0, avg_latency_ms=0, median_latency_ms=0, p95_latency_ms=0, p99_latency_ms=0, throughput_requests_per_second=0, success_rate=0, cache_hit_rate=0, memory_usage_mb=0, cpu_usage_percent=0, errors=[]), resource_usage={'memory_increase_mb': 0.00390625, 'cpu_usage_change': 0.0})"
+        ]
+      },
+      "duration_seconds": 1.657257080078125
+    }
+  }
+}

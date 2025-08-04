@@ -1,220 +1,339 @@
 """
 Team domain service for orchestrating team data retrieval and operations.
+Refactored to use BaseService for common functionality.
 """
 
-import logging
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
+from core.utils import LoggerFactory, APIResponseProcessor
+from core.exceptions import TeamNotFoundError, InvalidSearchCriteriaError
+from core.error_handler import with_domain_error_handling
+
+from .base_service import BaseService, BaseSearchCriteria, ServiceListResponse
 from ..models.base import SportType
 from ..models.team import Team, TeamStats
 from ..models.player import Player
 
-logger = logging.getLogger(__name__)
+logger = LoggerFactory.get_logger(__name__)
 
 
 @dataclass
-class TeamSearchCriteria:
-    """Criteria for searching teams across sports."""
+class TeamSearchCriteria(BaseSearchCriteria):
+    """Extended search criteria for teams."""
     name: Optional[str] = None
     city: Optional[str] = None
     conference: Optional[str] = None
     division: Optional[str] = None
-    sport: Optional[SportType] = None
 
 
-class TeamService:
+class TeamService(BaseService[Team]):
     """
     Domain service for team-related operations.
-    Orchestrates data retrieval, transformation, and business logic.
+    Inherits common functionality from BaseService.
     """
     
     def __init__(self, api_client):
         """Initialize with API client dependency."""
-        self.api_client = api_client
+        super().__init__(api_client, Team)
         
+    def get_api_endpoint(self) -> str:
+        """Get the API endpoint name for teams."""
+        return "teams"
+    
+    def create_search_criteria(self, **kwargs) -> TeamSearchCriteria:
+        """Create team search criteria from keyword arguments."""
+        return TeamSearchCriteria(**kwargs)
+    
+    def _extract_search_params(self, criteria: TeamSearchCriteria) -> Dict[str, Any]:
+        """Extract API parameters from team search criteria."""
+        params = super()._extract_search_params(criteria)
+        
+        # Teams API typically doesn't have search filters at API level
+        # Most filtering will be done client-side
+        return params
+    
+    def _apply_client_filters(self, results: List[Team], criteria: TeamSearchCriteria) -> List[Team]:
+        """Apply client-side filters for team-specific criteria."""
+        filtered = results
+        
+        # Filter by city if specified
+        if criteria.city:
+            city_lower = criteria.city.lower()
+            filtered = [
+                team for team in filtered
+                if team.city and city_lower in team.city.lower()
+            ]
+        
+        # Filter by conference if specified
+        if criteria.conference:
+            conference_lower = criteria.conference.lower()
+            filtered = [
+                team for team in filtered
+                if team.conference and conference_lower in team.conference.lower()
+            ]
+        
+        # Filter by division if specified
+        if criteria.division:
+            division_lower = criteria.division.lower()
+            filtered = [
+                team for team in filtered
+                if team.division and division_lower in team.division.lower()
+            ]
+        
+        return filtered
+    
+    # Convenience methods with backward compatibility
     async def get_team_by_id(self, team_id: int, sport: SportType) -> Optional[Team]:
-        """
-        Retrieve a team by ID and sport.
-        
-        Args:
-            team_id: Team's unique ID
-            sport: Sport type to search in
-            
-        Returns:
-            Team object or None if not found
-        """
-        try:
-            response = await self.api_client.get_teams(sport=sport, use_cache=True)
-            
-            if response.success and response.data.get('data'):
-                teams_data = response.data['data']
-                
-                # Find team with matching ID
-                for team_data in teams_data:
-                    if team_data.get('id') == team_id:
-                        return Team.from_api_response({'data': team_data}, sport)
-                        
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error retrieving team {team_id} for {sport}: {e}")
-            return None
+        """Retrieve a team by ID and sport."""
+        return await self.get_by_id(team_id, sport)
     
     async def get_all_teams(self, sport: SportType) -> List[Team]:
-        """
-        Get all teams for a specific sport.
-        
-        Args:
-            sport: Sport type
-            
-        Returns:
-            List of all teams in the sport
-        """
-        try:
-            response = await self.api_client.get_teams(sport=sport, use_cache=True)
-            
-            if not response.success or not response.data.get('data'):
-                return []
-                
-            teams = []
-            for team_data in response.data['data']:
-                team = Team.from_api_response({'data': team_data}, sport)
-                teams.append(team)
-                
-            return teams
-            
-        except Exception as e:
-            logger.error(f"Error retrieving teams for {sport}: {e}")
-            return []
+        """Get all teams for a specific sport."""
+        return await self.get_all(sport)
     
-    async def search_teams(self, criteria: TeamSearchCriteria) -> List[Team]:
-        """
-        Search for teams based on criteria.
-        
-        Args:
-            criteria: Search criteria
-            
-        Returns:
-            List of matching teams
-        """
-        teams = []
-        
-        try:
-            # Determine which sports to search
-            sports_to_search = [criteria.sport] if criteria.sport else list(SportType)
-            
-            for sport in sports_to_search:
-                sport_teams = await self.get_all_teams(sport)
-                
-                # Filter teams based on criteria
-                for team in sport_teams:
-                    if self._matches_criteria(team, criteria):
-                        teams.append(team)
-                        
-        except Exception as e:
-            logger.error(f"Error searching teams: {e}")
-            
-        return teams
+    async def search_teams(self, criteria: TeamSearchCriteria) -> ServiceListResponse[Team]:
+        """Search teams using criteria."""
+        return await self.search(criteria)
     
-    def _matches_criteria(self, team: Team, criteria: TeamSearchCriteria) -> bool:
-        """Check if team matches search criteria."""
-        # Name filter (case-insensitive partial match)
-        if criteria.name:
-            team_names = [team.name, team.full_name, team.city]
-            if not any(
-                criteria.name.lower() in (name or "").lower() 
-                for name in team_names
-            ):
-                return False
-                
-        # City filter
-        if criteria.city:
-            if criteria.city.lower() not in (team.city or "").lower():
-                return False
-                
-        # Conference filter
-        if criteria.conference:
-            conference = team.league_conference
-            if not conference or criteria.conference.lower() not in conference.lower():
-                return False
-                
-        # Division filter
-        if criteria.division:
-            division = team.league_division
-            if not division or criteria.division.lower() not in division.lower():
-                return False
-                
-        return True
-    
+    @with_domain_error_handling(fallback_value=[], suppress_hoophead_errors=True)
     async def get_teams_by_conference(self, sport: SportType, conference: str) -> List[Team]:
         """
         Get all teams in a specific conference.
         
         Args:
             sport: Sport type
-            conference: Conference name
+            conference: Conference name (e.g., "Eastern", "Western")
             
         Returns:
-            List of teams in the conference
+            List of Team objects in the conference
         """
-        try:
-            all_teams = await self.get_all_teams(sport)
-            
-            conference_teams = [
-                team for team in all_teams 
-                if team.league_conference and conference.lower() in team.league_conference.lower()
-            ]
-            
-            return conference_teams
-            
-        except Exception as e:
-            logger.error(f"Error retrieving teams for conference {conference} in {sport}: {e}")
-            return []
+        criteria = TeamSearchCriteria(
+            sport=sport,
+            conference=conference
+        )
+        
+        response = await self.search(criteria)
+        return response.data if response.success else []
     
+    @with_domain_error_handling(fallback_value=[], suppress_hoophead_errors=True)
     async def get_teams_by_division(self, sport: SportType, division: str) -> List[Team]:
         """
         Get all teams in a specific division.
         
         Args:
             sport: Sport type
-            division: Division name
+            division: Division name (e.g., "Atlantic", "Pacific")
             
         Returns:
-            List of teams in the division
+            List of Team objects in the division
         """
-        try:
-            all_teams = await self.get_all_teams(sport)
-            
-            division_teams = [
-                team for team in all_teams 
-                if team.league_division and division.lower() in team.league_division.lower()
-            ]
-            
-            return division_teams
-            
-        except Exception as e:
-            logger.error(f"Error retrieving teams for division {division} in {sport}: {e}")
-            return []
+        criteria = TeamSearchCriteria(
+            sport=sport,
+            division=division
+        )
+        
+        response = await self.search(criteria)
+        return response.data if response.success else []
     
+    @with_domain_error_handling(fallback_value=[], suppress_hoophead_errors=True)
     async def get_team_roster(self, team_id: int, sport: SportType) -> List[Player]:
         """
-        Get roster for a specific team.
+        Get the roster (all players) for a specific team.
         
         Args:
             team_id: Team's unique ID
             sport: Sport type
             
         Returns:
-            List of players on the team
+            List of Player objects on the team roster
         """
         try:
-            # Import here to avoid circular import
-            from .player_service import PlayerService
+            # Import PlayerService to avoid circular imports
+            from .player_service import PlayerService, PlayerSearchCriteria
             
+            # Create player service instance
             player_service = PlayerService(self.api_client)
-            return await player_service.get_team_roster(team_id, sport)
+            
+            # Search for players on this team
+            criteria = PlayerSearchCriteria(
+                sport=sport,
+                team_id=team_id,
+                active_only=True
+            )
+            
+            response = await player_service.search(criteria)
+            return response.data if response.success else []
             
         except Exception as e:
-            logger.error(f"Error retrieving roster for team {team_id} in {sport}: {e}")
-            return [] 
+            logger.error(f"Error retrieving roster for team {team_id}: {e}")
+            return []
+    
+    @with_domain_error_handling(fallback_value=None, suppress_hoophead_errors=True)
+    async def get_team_stats(self, team_id: int, sport: SportType, season: Optional[int] = None) -> Optional[TeamStats]:
+        """
+        Get team statistics for a specific season.
+        
+        Args:
+            team_id: Team's unique ID
+            sport: Sport type
+            season: Optional season filter
+            
+        Returns:
+            TeamStats object or None if not found
+        """
+        try:
+            params = {"team_ids[]": team_id}
+            if season:
+                params["seasons[]"] = season
+            
+            response = await self.api_client.get_stats(sport=sport, **params)
+            
+            if response.success and response.data.get('data'):
+                stats_data = APIResponseProcessor.extract_data(response.data)
+                
+                if stats_data:
+                    # Assuming first result is for our team
+                    team_stat_data = stats_data[0]
+                    return TeamStats.from_api_response({'data': team_stat_data}, sport)
+                    
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error retrieving team stats for {team_id}: {e}")
+            return None
+    
+    async def get_conference_standings(self, sport: SportType, conference: str, season: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get standings for all teams in a conference.
+        
+        Args:
+            sport: Sport type
+            conference: Conference name
+            season: Optional season filter
+            
+        Returns:
+            List of team standings with wins, losses, etc.
+        """
+        try:
+            teams = await self.get_teams_by_conference(sport, conference)
+            standings = []
+            
+            for team in teams:
+                team_stats = await self.get_team_stats(team.id, sport, season)
+                
+                standings.append({
+                    'team_id': team.id,
+                    'team_name': team.name,
+                    'team_city': team.city,
+                    'wins': team_stats.wins if team_stats else 0,
+                    'losses': team_stats.losses if team_stats else 0,
+                    'win_percentage': team_stats.win_percentage if team_stats else 0.0,
+                    'conference': team.conference,
+                    'division': team.division
+                })
+            
+            # Sort by win percentage (descending)
+            standings.sort(key=lambda x: x['win_percentage'], reverse=True)
+            
+            return standings
+            
+        except Exception as e:
+            logger.error(f"Error retrieving conference standings for {conference}: {e}")
+            return []
+    
+    async def get_division_standings(self, sport: SportType, division: str, season: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get standings for all teams in a division.
+        
+        Args:
+            sport: Sport type
+            division: Division name
+            season: Optional season filter
+            
+        Returns:
+            List of team standings with wins, losses, etc.
+        """
+        try:
+            teams = await self.get_teams_by_division(sport, division)
+            standings = []
+            
+            for team in teams:
+                team_stats = await self.get_team_stats(team.id, sport, season)
+                
+                standings.append({
+                    'team_id': team.id,
+                    'team_name': team.name,
+                    'team_city': team.city,
+                    'wins': team_stats.wins if team_stats else 0,
+                    'losses': team_stats.losses if team_stats else 0,
+                    'win_percentage': team_stats.win_percentage if team_stats else 0.0,
+                    'conference': team.conference,
+                    'division': team.division
+                })
+            
+            # Sort by win percentage (descending)
+            standings.sort(key=lambda x: x['win_percentage'], reverse=True)
+            
+            return standings
+            
+        except Exception as e:
+            logger.error(f"Error retrieving division standings for {division}: {e}")
+            return []
+    
+    async def compare_teams(self, team_ids: List[int], sport: SportType, season: Optional[int] = None) -> Dict[int, Dict[str, Any]]:
+        """
+        Compare statistics between multiple teams.
+        
+        Args:
+            team_ids: List of team IDs to compare
+            sport: Sport type
+            season: Optional season to compare
+            
+        Returns:
+            Dictionary mapping team_id to their stats summary
+        """
+        comparison = {}
+        
+        for team_id in team_ids:
+            try:
+                team = await self.get_team_by_id(team_id, sport)
+                if team:
+                    stats = await self.get_team_stats(team_id, sport, season)
+                    
+                    comparison[team_id] = {
+                        'team_name': f"{team.city} {team.name}",
+                        'conference': team.conference or 'Unknown',
+                        'division': team.division or 'Unknown',
+                        'wins': stats.wins if stats else 0,
+                        'losses': stats.losses if stats else 0,
+                        'win_percentage': stats.win_percentage if stats else 0.0,
+                        'abbreviation': team.abbreviation or team.name[:3].upper()
+                    }
+                
+            except Exception as e:
+                logger.warning(f"Failed to get stats for team {team_id}: {e}")
+                comparison[team_id] = {'error': str(e)}
+        
+        return comparison
+    
+    async def get_popular_teams(self, sport: SportType, limit: int = 10) -> List[Team]:
+        """
+        Get popular/featured teams for a sport.
+        This is a simplified implementation - extend with actual popularity metrics.
+        
+        Args:
+            sport: Sport type
+            limit: Maximum number of teams to return
+            
+        Returns:
+            List of popular Team objects
+        """
+        # For now, just return the first N teams
+        # In a real implementation, this would use popularity metrics
+        all_teams = await self.get_all(sport)
+        return all_teams[:limit]
+
+
+# Export the service
+__all__ = ['TeamService', 'TeamSearchCriteria'] 
